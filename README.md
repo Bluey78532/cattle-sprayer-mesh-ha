@@ -1,20 +1,31 @@
-﻿# Cattle Sprayer Mesh — Home Assistant
+﻿# Sinewerx Mesh — Home Assistant
 
 [![Add repository to HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Bluey78532&repository=cattle-sprayer-mesh-ha&category=integration)
-[![Add integration to my Home Assistant](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=cattle_sprayer_mesh)
+[![Add integration to my Home Assistant](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=sinewerx_mesh)
 
-Public Home Assistant integration for **Sinewerx Automatic Cattle Sprayer** units on a private MeshCore channel.
+Public Home Assistant integration for the **Sinewerx Mesh house gateway** (Xiao S3 WIO) and field devices (sprayers, pumps, …) on a private MeshCore channel.
 
-Firmware and product docs stay in the private product repo. This repository is only the HACS-installable integration.
+Firmware and product docs stay in the private product repo. This repository is the HACS-installable integration only.
 
-## Install
+## Prefer MQTT when possible
+
+If the gateway **Settings → Home Assistant MQTT** has a broker set, Home Assistant only needs the built-in **MQTT** integration — no custom component. Use this HACS integration when you do **not** want MQTT.
+
+## Install (HTTP / mDNS)
 
 1. HACS → Custom repositories → add `https://github.com/Bluey78532/cattle-sprayer-mesh-ha` as **Integration** (or use the badge above).
-2. Download **Cattle Sprayer Mesh**, restart Home Assistant.
-3. Plug a MeshCore USB companion into the HA box.
-4. SoftAP on a sprayer → **Add to Home Assistant**, or: **Settings → Devices & services → Add integration → Cattle Sprayer Mesh**.
-5. Paste the SoftAP pairing card and select the USB port.
+2. Download **Sinewerx Mesh**, restart Home Assistant.
+3. **Settings → Devices & services → Add integration → Sinewerx Mesh** (or accept zeroconf `_swx-gw._tcp`).
+4. Enter the gateway LAN IP (e.g. `192.168.20.253`) or `sinewerx-gw.local`.
+
+Do **not** also connect Home Assistant to the gateway companion TCP **5000** / USB / BLE — the gateway owns the radio.
+
+Domain: `sinewerx_mesh`.
+
+## Legacy
+
+**Cattle Sprayer Mesh** (`cattle_sprayer_mesh`) — companion TCP/USB into HA — is deprecated. Remove it and use MQTT or **Sinewerx Mesh** instead.
 
 ## License
 
-MIT — see product branding; integration code may be used with Sinewerx sprayers.
+MIT — see product branding; integration code may be used with Sinewerx devices.

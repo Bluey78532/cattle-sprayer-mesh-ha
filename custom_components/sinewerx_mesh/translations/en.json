@@ -1,0 +1,25 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Sinewerx Mesh Gateway",
+        "description": "Enter the gateway LAN IP (or sinewerx-gw.local). Prefer MQTT discovery when the gateway has a broker configured — this integration is for installs without MQTT.",
+        "data": {
+          "host": "Host",
+          "port": "HTTP port"
+        }
+      },
+      "discovery_confirm": {
+        "title": "Sinewerx Mesh Gateway",
+        "description": "Found gateway at {host}. Add it to Home Assistant?"
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not reach /api/status on the gateway"
+    },
+    "abort": {
+      "already_configured": "This gateway is already configured",
+      "cannot_connect": "Could not reach the discovered gateway"
+    }
+  }
+}
