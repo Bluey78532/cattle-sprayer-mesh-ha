@@ -11,7 +11,7 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
-from .const import CONN_WIFI, DOMAIN
+from .const import CONN_BLE, CONN_USB, CONN_WIFI, DOMAIN
 from .cs_parse import CsEvent, parse_cs, parse_pairing_blob
 
 _LOGGER = logging.getLogger(__name__)
@@ -32,7 +32,7 @@ class SprayerState:
 
 
 class MeshHub:
-    """Owns the MeshCore companion session (Wi‑Fi TCP or USB) and sprayer state."""
+    """Owns the MeshCore companion session (Wi‑Fi / USB / BLE) and sprayer state."""
 
     def __init__(
         self,
@@ -45,6 +45,8 @@ class MeshHub:
         baud: int = 115200,
         host: str | None = None,
         tcp_port: int = 5000,
+        ble_address: str | None = None,
+        ble_pin: str | None = None,
     ) -> None:
         self.hass = hass
         self.entry_id = entry_id
@@ -53,6 +55,8 @@ class MeshHub:
         self.baud = baud
         self.host = host
         self.tcp_port = tcp_port
+        self.ble_address = (ble_address or "").strip() or None
+        self.ble_pin = (ble_pin or "").strip() or None
         self.pairing = parse_pairing_blob(pairing_raw)
         self.channel_idx = int(self.pairing.get("channel_idx") or 1)
         self.sprayers: dict[str, SprayerState] = {}
@@ -69,9 +73,13 @@ class MeshHub:
 
     def device_info_bridge(self) -> dict[str, Any]:
         if self.connection == CONN_WIFI and self.host:
-            model = f"MeshCore Wi‑Fi companion ({self.host})"
+            model = f"MeshCore Wi‑Fi gateway ({self.host})"
+        elif self.connection == CONN_BLE:
+            model = f"MeshCore BLE gateway ({self.ble_address or 'scan'})"
+        elif self.connection == CONN_USB:
+            model = "MeshCore USB gateway"
         else:
-            model = "MeshCore USB companion"
+            model = "MeshCore house gateway"
         return {
             "identifiers": {(DOMAIN, f"bridge_{self.entry_id}")},
             "name": "Cattle Sprayer Mesh bridge",
@@ -92,11 +100,12 @@ class MeshHub:
 
     async def async_start(self) -> None:
         _LOGGER.warning(
-            "Mesh hub task starting connection=%s serial=%s host=%s:%s",
+            "Mesh hub task starting connection=%s serial=%s host=%s:%s ble=%s",
             self.connection,
             self.serial_port,
             self.host,
             self.tcp_port,
+            self.ble_address,
         )
         self._task = self.hass.async_create_background_task(
             self._run(),
@@ -158,6 +167,26 @@ class MeshHub:
             except TimeoutError as exc:
                 raise RuntimeError(
                     f"Timed out opening MeshCore TCP {self.host}:{self.tcp_port}"
+                ) from exc
+        elif self.connection == CONN_BLE:
+            _LOGGER.warning(
+                "Connecting MeshCore companion via BLE %s",
+                self.ble_address or "(scan MeshCore-*)",
+            )
+            try:
+                mc = await asyncio.wait_for(
+                    MeshCore.create_ble(
+                        self.ble_address,
+                        pin=self.ble_pin,
+                        auto_reconnect=True,
+                        max_reconnect_attempts=5,
+                        debug=True,
+                    ),
+                    timeout=45,
+                )
+            except TimeoutError as exc:
+                raise RuntimeError(
+                    f"Timed out opening MeshCore BLE {self.ble_address or 'scan'}"
                 ) from exc
         else:
             if not self.serial_port:

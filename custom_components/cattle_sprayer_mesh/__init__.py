@@ -10,12 +10,15 @@ from homeassistant.core import HomeAssistant
 
 from .const import (
     CONF_BAUD,
+    CONF_BLE_ADDRESS,
+    CONF_BLE_PIN,
     CONF_CONNECTION,
     CONF_PAIRING,
     CONF_SERIAL_PORT,
     CONN_USB,
     CONN_WIFI,
     DEFAULT_BAUD,
+    DEFAULT_BLE_PIN,
     DEFAULT_TCP_PORT,
     DOMAIN,
 )
@@ -43,15 +46,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         baud=int(data.get(CONF_BAUD) or DEFAULT_BAUD),
         host=data.get(CONF_HOST),
         tcp_port=int(data.get(CONF_PORT) or DEFAULT_TCP_PORT),
+        ble_address=data.get(CONF_BLE_ADDRESS),
+        ble_pin=data.get(CONF_BLE_PIN) or DEFAULT_BLE_PIN,
         pairing_raw=data[CONF_PAIRING],
     )
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = hub
     _LOGGER.warning(
-        "Cattle Sprayer Mesh starting (%s) entry=%s port=%s host=%s",
+        "Cattle Sprayer Mesh starting (%s) entry=%s port=%s host=%s ble=%s",
         connection,
         entry.entry_id,
         data.get(CONF_SERIAL_PORT),
         data.get(CONF_HOST),
+        data.get(CONF_BLE_ADDRESS),
     )
     await hub.async_start()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

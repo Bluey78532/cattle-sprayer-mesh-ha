@@ -3,43 +3,57 @@
     "step": {
       "user": {
         "title": "Cattle Sprayer Mesh",
-        "description": "Choose how Home Assistant talks to your house MeshCore radio. Prefer the Wi‑Fi gateway so the radio can sit for LoRa range while HA stays on the LAN.",
+        "description": "Connect Home Assistant to your house MeshCore gateway. One gateway image supports Wi‑Fi, USB, and Bluetooth — pick how HA should talk to it.",
         "data": {
           "connection": "Connection"
         }
       },
       "wifi": {
-        "title": "Wi‑Fi gateway",
-        "description": "Use a Cattle Sprayer Mesh Wi‑Fi gateway (Xiao S3 WIO flashed with Xiao_S3_WIO_cs_gateway). Join its SoftAP CattleSprayer-GW-xxxx, open http://192.168.4.1/, enter home Wi‑Fi, then enter the gateway IP here (TCP 5000) and paste the sprayer SoftAP pairing card.",
+        "title": "Wi‑Fi (TCP)",
+        "description": "Gateway SoftAP CattleSprayer-GW-xxxx → http://192.168.4.1/ → home Wi‑Fi. Then enter the gateway IP (TCP 5000) and the sprayer SoftAP pairing card.",
         "data": {
           "host": "Gateway IP or hostname",
           "port": "TCP port",
           "pairing": "Pairing card (JSON)"
         },
         "data_description": {
-          "host": "Shown on the gateway settings page after it joins home Wi‑Fi (or your router)",
-          "port": "Always 5000 for the Cattle Sprayer gateway",
-          "pairing": "Copy from a sprayer SoftAP → Network → MeshCore → Add to home"
+          "host": "From the gateway status page or your router",
+          "port": "5000",
+          "pairing": "Sprayer SoftAP → Network → MeshCore → Add to home"
         }
       },
       "usb": {
-        "title": "USB companion",
-        "description": "Plug a MeshCore USB radio into this Home Assistant box. Paste the SoftAP pairing card (Network → MeshCore → Add to home).\n\nUSB ports found: {ports}",
+        "title": "USB",
+        "description": "Plug the gateway into this Home Assistant box. Paste the SoftAP pairing card.\n\nUSB ports found: {ports}",
         "data": {
           "serial_port": "USB radio port",
           "pairing": "Pairing card (JSON)",
           "baud": "Baud rate"
         },
         "data_description": {
-          "serial_port": "Use the path from Settings → System → Hardware → ⓘ (often /dev/ttyACM0), not Windows COM3",
-          "pairing": "Copy from the sprayer SoftAP Add to home card",
-          "baud": "Leave at 115200 unless your companion uses something else"
+          "serial_port": "Hardware → ⓘ path (e.g. /dev/ttyACM0)",
+          "pairing": "Sprayer SoftAP pairing card",
+          "baud": "115200"
+        }
+      },
+      "ble": {
+        "title": "Bluetooth",
+        "description": "Needs a Bluetooth adapter on the Home Assistant host (not an ESPHome Bluetooth proxy). Gateway advertises as MeshCore-… with PIN 123456. Leave address blank to scan.",
+        "data": {
+          "ble_address": "BLE address (optional)",
+          "ble_pin": "BLE PIN",
+          "pairing": "Pairing card (JSON)"
+        },
+        "data_description": {
+          "ble_address": "e.g. AA:BB:CC:DD:EE:FF — blank = scan for MeshCore-",
+          "ble_pin": "Default gateway PIN is 123456",
+          "pairing": "Sprayer SoftAP pairing card"
         }
       }
     },
     "error": {
       "invalid_pairing": "That pairing card could not be read. Copy the full JSON from SoftAP (needs a 32-hex secret).",
-      "cannot_connect": "Could not talk to the MeshCore radio. For Wi‑Fi: check gateway IP and port 5000. For USB: Companion USB firmware, Hardware ⓘ path, nothing else using the port."
+      "cannot_connect": "Could not talk to the gateway. Check Wi‑Fi IP:5000, USB path, or BLE address/PIN 123456 (and that nothing else owns the link)."
     },
     "abort": {
       "already_configured": "This companion is already set up"

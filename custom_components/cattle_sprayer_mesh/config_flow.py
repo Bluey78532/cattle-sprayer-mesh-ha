@@ -13,12 +13,16 @@ from homeassistant.data_entry_flow import FlowResult
 
 from .const import (
     CONF_BAUD,
+    CONF_BLE_ADDRESS,
+    CONF_BLE_PIN,
     CONF_CONNECTION,
     CONF_PAIRING,
     CONF_SERIAL_PORT,
+    CONN_BLE,
     CONN_USB,
     CONN_WIFI,
     DEFAULT_BAUD,
+    DEFAULT_BLE_PIN,
     DEFAULT_TCP_PORT,
     DOMAIN,
 )
@@ -34,10 +38,8 @@ def _list_ports() -> list[str]:
         return []
     found: list[str] = []
     for p in list_ports.comports():
-        # Prefer stable by-id style paths when pyserial exposes them via device
         if p.device:
             found.append(p.device)
-    # De-dupe preserving order
     out: list[str] = []
     for d in found:
         if d not in out:
@@ -46,7 +48,6 @@ def _list_ports() -> list[str]:
 
 
 async def _probe_serial(port: str, baud: int) -> str | None:
-    """Return None on success, or an error key."""
     try:
         from meshcore import MeshCore
     except Exception:  # noqa: BLE001
@@ -67,10 +68,6 @@ async def _probe_serial(port: str, baud: int) -> str | None:
         return "cannot_connect"
 
     if mc is None:
-        _LOGGER.error(
-            "MeshCore did not answer on %s — use Companion USB firmware, not Bluetooth",
-            port,
-        )
         return "cannot_connect"
 
     try:
@@ -110,10 +107,46 @@ async def _probe_tcp(host: str, port: int) -> str | None:
     return None
 
 
-class CattleSprayerMeshConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Wi‑Fi (TCP) or USB companion + SoftAP pairing card."""
+async def _probe_ble(address: str | None, pin: str | None) -> str | None:
+    try:
+        from meshcore import MeshCore
+    except Exception:  # noqa: BLE001
+        _LOGGER.exception("meshcore import failed")
+        return "cannot_connect"
 
-    VERSION = 2
+    addr = (address or "").strip() or None
+    pin_s = (pin or "").strip() or None
+    mc = None
+    try:
+        mc = await asyncio.wait_for(
+            MeshCore.create_ble(
+                addr,
+                pin=pin_s,
+                debug=True,
+            ),
+            timeout=45,
+        )
+    except TimeoutError:
+        _LOGGER.error("Timed out opening MeshCore BLE %s", addr or "(scan)")
+        return "cannot_connect"
+    except Exception:  # noqa: BLE001
+        _LOGGER.exception("Failed opening MeshCore BLE %s", addr or "(scan)")
+        return "cannot_connect"
+
+    if mc is None:
+        return "cannot_connect"
+
+    try:
+        await mc.disconnect()
+    except Exception:  # noqa: BLE001
+        pass
+    return None
+
+
+class CattleSprayerMeshConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+    """Wi‑Fi / USB / BLE house gateway + SoftAP pairing card."""
+
+    VERSION = 3
 
     def __init__(self) -> None:
         self._connection: str | None = None
@@ -125,6 +158,8 @@ class CattleSprayerMeshConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._connection = user_input[CONF_CONNECTION]
             if self._connection == CONN_WIFI:
                 return await self.async_step_wifi()
+            if self._connection == CONN_BLE:
+                return await self.async_step_ble()
             return await self.async_step_usb()
 
         return self.async_show_form(
@@ -133,8 +168,9 @@ class CattleSprayerMeshConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 {
                     vol.Required(CONF_CONNECTION, default=CONN_WIFI): vol.In(
                         {
-                            CONN_WIFI: "Wi‑Fi gateway (recommended — radio can be far from HA)",
-                            CONN_USB: "USB companion plugged into Home Assistant",
+                            CONN_WIFI: "Wi‑Fi (TCP) — gateway SoftAP / home LAN",
+                            CONN_USB: "USB — gateway plugged into Home Assistant",
+                            CONN_BLE: "Bluetooth — HA host Bluetooth adapter",
                         }
                     ),
                 }
@@ -177,6 +213,50 @@ class CattleSprayerMeshConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 {
                     vol.Required(CONF_HOST, default=""): str,
                     vol.Required(CONF_PORT, default=DEFAULT_TCP_PORT): int,
+                    vol.Required(CONF_PAIRING, default=""): str,
+                }
+            ),
+            errors=errors,
+        )
+
+    async def async_step_ble(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            try:
+                pairing = parse_pairing_blob(user_input[CONF_PAIRING])
+            except Exception:  # noqa: BLE001
+                errors["base"] = "invalid_pairing"
+            else:
+                address = (user_input.get(CONF_BLE_ADDRESS) or "").strip()
+                pin = (user_input.get(CONF_BLE_PIN) or DEFAULT_BLE_PIN).strip()
+                err = await _probe_ble(address or None, pin)
+                if err:
+                    errors["base"] = err
+                else:
+                    uid = address.lower() if address else f"scan_{pin}"
+                    await self.async_set_unique_id(f"cs_mesh_ble_{uid}")
+                    self._abort_if_unique_id_configured()
+                    title = pairing.get("ch") or "Cattle Sprayer Mesh"
+                    label = address or "BLE"
+                    return self.async_create_entry(
+                        title=f"Cattle Sprayer Mesh ({title} @ {label})",
+                        data={
+                            CONF_CONNECTION: CONN_BLE,
+                            CONF_BLE_ADDRESS: address,
+                            CONF_BLE_PIN: pin,
+                            CONF_PAIRING: user_input[CONF_PAIRING].strip(),
+                            CONF_NAME: title,
+                        },
+                    )
+
+        return self.async_show_form(
+            step_id="ble",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(CONF_BLE_ADDRESS, default=""): str,
+                    vol.Required(CONF_BLE_PIN, default=DEFAULT_BLE_PIN): str,
                     vol.Required(CONF_PAIRING, default=""): str,
                 }
             ),
@@ -227,6 +307,8 @@ class CattleSprayerMeshConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             ),
             errors=errors,
             description_placeholders={
-                "ports": ", ".join(ports) if ports else "none found — type the path from Hardware → ⓘ",
+                "ports": ", ".join(ports)
+                if ports
+                else "none found — type the path from Hardware → ⓘ",
             },
         )
