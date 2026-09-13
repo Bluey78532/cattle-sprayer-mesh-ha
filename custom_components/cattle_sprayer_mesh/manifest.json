@@ -3,9 +3,9 @@
   "name": "Cattle Sprayer Mesh",
   "codeowners": ["@sinewerx"],
   "config_flow": true,
-  "documentation": "https://github.com/sinewerx/automatic-cattle-sprayer/blob/main/docs/homeassistant.md",
+  "documentation": "https://github.com/Bluey78532/cattle-sprayer-mesh-ha",
   "iot_class": "local_push",
-  "issue_tracker": "https://github.com/sinewerx/automatic-cattle-sprayer/issues",
+  "issue_tracker": "https://github.com/Bluey78532/cattle-sprayer-mesh-ha/issues",
   "loggers": ["custom_components.cattle_sprayer_mesh"],
   "requirements": [
     "meshcore>=2.3.0",
