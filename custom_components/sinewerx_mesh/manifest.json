@@ -1,19 +1,13 @@
 {
   "domain": "sinewerx_mesh",
   "name": "Sinewerx Mesh",
-  "codeowners": [
-    "@sinewerx"
-  ],
+  "codeowners": ["@sinewerx"],
   "config_flow": true,
   "documentation": "https://github.com/Bluey78532/sinewerx-mesh-ha",
   "iot_class": "local_push",
   "issue_tracker": "https://github.com/Bluey78532/sinewerx-mesh-ha/issues",
-  "loggers": [
-    "custom_components.sinewerx_mesh"
-  ],
+  "loggers": ["custom_components.sinewerx_mesh"],
   "requirements": [],
-  "version": "2.1.0",
-  "zeroconf": [
-    "_swx-gw._tcp.local."
-  ]
+  "version": "2.1.1",
+  "zeroconf": ["_swx-gw._tcp.local."]
 }

@@ -8,7 +8,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import UnitOfElectricPotential, UnitOfIlluminance, UnitOfTime
+from homeassistant.const import UnitOfElectricPotential, UnitOfTime
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import EntityCategory
@@ -16,6 +16,9 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN, SIGNAL_BRIDGE, SIGNAL_DEVICE, SIGNAL_NEW_DEVICE, STALE_SECONDS
 from .hub import GatewayHub
+
+# HA removed UnitOfIlluminance; illuminance unit is the string "lx".
+_LIGHT_LUX = "lx"
 
 
 async def async_setup_entry(
@@ -128,7 +131,7 @@ class SwxLux(_SwxSensor):
     _attr_name = "Light"
     _attr_device_class = SensorDeviceClass.ILLUMINANCE
     _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_native_unit_of_measurement = UnitOfIlluminance.LUX
+    _attr_native_unit_of_measurement = _LIGHT_LUX
 
     def __init__(self, hub: GatewayHub, node_id: str) -> None:
         super().__init__(hub, node_id, "lux")
