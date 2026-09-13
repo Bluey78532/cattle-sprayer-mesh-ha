@@ -5,10 +5,20 @@ from __future__ import annotations
 import logging
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import Platform
+from homeassistant.const import CONF_HOST, CONF_PORT, Platform
 from homeassistant.core import HomeAssistant
 
-from .const import CONF_BAUD, CONF_PAIRING, CONF_SERIAL_PORT, DEFAULT_BAUD, DOMAIN
+from .const import (
+    CONF_BAUD,
+    CONF_CONNECTION,
+    CONF_PAIRING,
+    CONF_SERIAL_PORT,
+    CONN_USB,
+    CONN_WIFI,
+    DEFAULT_BAUD,
+    DEFAULT_TCP_PORT,
+    DOMAIN,
+)
 from .hub import MeshHub
 
 _LOGGER = logging.getLogger(__name__)
@@ -21,14 +31,28 @@ PLATFORMS: list[Platform] = [
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    data = entry.data
+    connection = data.get(CONF_CONNECTION) or (
+        CONN_USB if data.get(CONF_SERIAL_PORT) else CONN_WIFI
+    )
     hub = MeshHub(
         hass,
         entry.entry_id,
-        serial_port=entry.data[CONF_SERIAL_PORT],
-        baud=int(entry.data.get(CONF_BAUD) or DEFAULT_BAUD),
-        pairing_raw=entry.data[CONF_PAIRING],
+        connection=connection,
+        serial_port=data.get(CONF_SERIAL_PORT),
+        baud=int(data.get(CONF_BAUD) or DEFAULT_BAUD),
+        host=data.get(CONF_HOST),
+        tcp_port=int(data.get(CONF_PORT) or DEFAULT_TCP_PORT),
+        pairing_raw=data[CONF_PAIRING],
     )
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = hub
+    _LOGGER.warning(
+        "Cattle Sprayer Mesh starting (%s) entry=%s port=%s host=%s",
+        connection,
+        entry.entry_id,
+        data.get(CONF_SERIAL_PORT),
+        data.get(CONF_HOST),
+    )
     await hub.async_start()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True

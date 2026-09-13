@@ -11,13 +11,14 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
-from .const import DOMAIN
+from .const import CONN_WIFI, DOMAIN
 from .cs_parse import CsEvent, parse_cs, parse_pairing_blob
 
 _LOGGER = logging.getLogger(__name__)
 
 SIGNAL_SPRAYER = f"{DOMAIN}_sprayer_update"
 SIGNAL_NEW_SPRAYER = f"{DOMAIN}_new_sprayer"
+SIGNAL_BRIDGE = f"{DOMAIN}_bridge_update"
 
 
 @dataclass
@@ -31,20 +32,27 @@ class SprayerState:
 
 
 class MeshHub:
-    """Owns the USB companion session and sprayer state."""
+    """Owns the MeshCore companion session (Wi‑Fi TCP or USB) and sprayer state."""
 
     def __init__(
         self,
         hass: HomeAssistant,
         entry_id: str,
-        serial_port: str,
-        baud: int,
+        *,
+        connection: str,
         pairing_raw: str,
+        serial_port: str | None = None,
+        baud: int = 115200,
+        host: str | None = None,
+        tcp_port: int = 5000,
     ) -> None:
         self.hass = hass
         self.entry_id = entry_id
+        self.connection = connection
         self.serial_port = serial_port
         self.baud = baud
+        self.host = host
+        self.tcp_port = tcp_port
         self.pairing = parse_pairing_blob(pairing_raw)
         self.channel_idx = int(self.pairing.get("channel_idx") or 1)
         self.sprayers: dict[str, SprayerState] = {}
@@ -53,12 +61,22 @@ class MeshHub:
         self._cmd_queue: asyncio.Queue[str] = asyncio.Queue()
         self.available = False
 
+    def _set_available(self, value: bool) -> None:
+        if self.available == value:
+            return
+        self.available = value
+        async_dispatcher_send(self.hass, f"{SIGNAL_BRIDGE}_{self.entry_id}")
+
     def device_info_bridge(self) -> dict[str, Any]:
+        if self.connection == CONN_WIFI and self.host:
+            model = f"MeshCore Wi‑Fi companion ({self.host})"
+        else:
+            model = "MeshCore USB companion"
         return {
             "identifiers": {(DOMAIN, f"bridge_{self.entry_id}")},
             "name": "Cattle Sprayer Mesh bridge",
             "manufacturer": "Sinewerx",
-            "model": "MeshCore USB companion",
+            "model": model,
         }
 
     def device_info_sprayer(self, node_id: str) -> dict[str, Any]:
@@ -73,6 +91,13 @@ class MeshHub:
         }
 
     async def async_start(self) -> None:
+        _LOGGER.warning(
+            "Mesh hub task starting connection=%s serial=%s host=%s:%s",
+            self.connection,
+            self.serial_port,
+            self.host,
+            self.tcp_port,
+        )
         self._task = self.hass.async_create_background_task(
             self._run(),
             name=f"{DOMAIN}_hub_{self.entry_id}",
@@ -92,7 +117,7 @@ class MeshHub:
             except Exception:  # noqa: BLE001
                 pass
             self._mc = None
-        self.available = False
+        self._set_available(False)
 
     async def async_send_channel(self, text: str) -> None:
         await self._cmd_queue.put(text.strip())
@@ -107,17 +132,52 @@ class MeshHub:
                 raise
             except Exception:  # noqa: BLE001
                 _LOGGER.exception("Mesh hub session failed; retrying in 10s")
-                self.available = False
+                self._set_available(False)
                 await asyncio.sleep(10)
 
     async def _session(self, EventType, MeshCore) -> None:
-        _LOGGER.info("Connecting MeshCore companion on %s", self.serial_port)
-        mc = await MeshCore.create_serial(
-            self.serial_port,
-            baudrate=self.baud,
-            auto_reconnect=True,
-            max_reconnect_attempts=5,
-        )
+        if self.connection == CONN_WIFI:
+            if not self.host:
+                raise RuntimeError("Wi‑Fi companion host not set")
+            _LOGGER.warning(
+                "Connecting MeshCore companion via TCP %s:%s",
+                self.host,
+                self.tcp_port,
+            )
+            try:
+                mc = await asyncio.wait_for(
+                    MeshCore.create_tcp(
+                        self.host,
+                        self.tcp_port,
+                        auto_reconnect=True,
+                        max_reconnect_attempts=5,
+                        debug=True,
+                    ),
+                    timeout=30,
+                )
+            except TimeoutError as exc:
+                raise RuntimeError(
+                    f"Timed out opening MeshCore TCP {self.host}:{self.tcp_port}"
+                ) from exc
+        else:
+            if not self.serial_port:
+                raise RuntimeError("USB companion port not set")
+            _LOGGER.warning("Connecting MeshCore companion on %s", self.serial_port)
+            try:
+                mc = await asyncio.wait_for(
+                    MeshCore.create_serial(
+                        self.serial_port,
+                        baudrate=self.baud,
+                        auto_reconnect=True,
+                        max_reconnect_attempts=5,
+                        debug=True,
+                    ),
+                    timeout=30,
+                )
+            except TimeoutError as exc:
+                raise RuntimeError(
+                    f"Timed out opening MeshCore on {self.serial_port}"
+                ) from exc
         if mc is None:
             raise RuntimeError("MeshCore companion did not answer")
         self._mc = mc
@@ -139,8 +199,8 @@ class MeshHub:
 
         mc.subscribe(EventType.CHANNEL_MSG_RECV, on_channel)
         await mc.start_auto_message_fetching()
-        self.available = True
-        _LOGGER.info(
+        self._set_available(True)
+        _LOGGER.warning(
             "Listening for cattle sprayers on channel %s (%s)",
             self.channel_idx,
             p["ch"],
@@ -156,7 +216,7 @@ class MeshHub:
                 await worker
             except asyncio.CancelledError:
                 pass
-            self.available = False
+            self._set_available(False)
             try:
                 await mc.disconnect()
             except Exception:  # noqa: BLE001

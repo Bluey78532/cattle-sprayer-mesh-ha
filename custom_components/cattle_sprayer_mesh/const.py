@@ -3,12 +3,20 @@
 from __future__ import annotations
 
 DOMAIN = "cattle_sprayer_mesh"
+
+CONF_CONNECTION = "connection"
 CONF_SERIAL_PORT = "serial_port"
 CONF_BAUD = "baud"
+CONF_HOST = "host"
+CONF_PORT = "port"
 CONF_PAIRING = "pairing"
 CONF_CHANNEL_IDX = "channel_idx"
 
+CONN_WIFI = "wifi"
+CONN_USB = "usb"
+
 DEFAULT_BAUD = 115200
+DEFAULT_TCP_PORT = 5000
 DEFAULT_CHANNEL_IDX = 1
 
 # Stale after ~3 h (matches ~1 h heartbeat with margin)

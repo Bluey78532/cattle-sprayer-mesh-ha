@@ -14,7 +14,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN, STALE_SECONDS
-from .hub import MeshHub, SIGNAL_NEW_SPRAYER, SIGNAL_SPRAYER
+from .hub import MeshHub, SIGNAL_BRIDGE, SIGNAL_NEW_SPRAYER, SIGNAL_SPRAYER
 
 
 async def async_setup_entry(
@@ -40,6 +40,8 @@ async def async_setup_entry(
         known.add(node_id)
         async_add_entities(_entities_for(node_id))
 
+    async_add_entities([BridgeConnectedBinary(hub)])
+
     for nid in list(hub.sprayers):
         _add_node(nid)
 
@@ -48,6 +50,37 @@ async def async_setup_entry(
             hass, f"{SIGNAL_NEW_SPRAYER}_{entry.entry_id}", _add_node
         )
     )
+
+
+class BridgeConnectedBinary(BinarySensorEntity):
+    """Shows whether the house MeshCore companion is connected."""
+
+    _attr_has_entity_name = True
+    _attr_name = "Connected"
+    _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
+    _attr_should_poll = False
+
+    def __init__(self, hub: MeshHub) -> None:
+        self._hub = hub
+        self._attr_unique_id = f"{DOMAIN}_{hub.entry_id}_bridge_connected"
+        self._attr_device_info = hub.device_info_bridge()
+
+    @property
+    def is_on(self) -> bool:
+        return bool(self._hub.available)
+
+    async def async_added_to_hass(self) -> None:
+        @callback
+        def _updated() -> None:
+            self.async_write_ha_state()
+
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                f"{SIGNAL_BRIDGE}_{self._hub.entry_id}",
+                _updated,
+            )
+        )
 
 
 class SprayerBinaryBase(BinarySensorEntity):
