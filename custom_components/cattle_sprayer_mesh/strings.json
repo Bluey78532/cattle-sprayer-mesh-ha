@@ -1,0 +1,26 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Cattle Sprayer Mesh",
+        "description": "Plug a MeshCore USB radio into this Home Assistant box. Paste the SoftAP pairing card (Network → MeshCore → Add to home).\n\nUSB ports found: {ports}",
+        "data": {
+          "serial_port": "USB radio port",
+          "pairing": "Pairing card (JSON)",
+          "baud": "Baud rate"
+        },
+        "data_description": {
+          "serial_port": "Example: /dev/ttyUSB0 or /dev/ttyACM0 (on Windows HA: COMx)",
+          "pairing": "Copy from the sprayer SoftAP Add to home card",
+          "baud": "Leave at 115200 unless your companion uses something else"
+        }
+      }
+    },
+    "error": {
+      "invalid_pairing": "That pairing card could not be read. Copy the full JSON from SoftAP (needs a 32-hex secret)."
+    },
+    "abort": {
+      "already_configured": "This USB port is already set up"
+    }
+  }
+}
