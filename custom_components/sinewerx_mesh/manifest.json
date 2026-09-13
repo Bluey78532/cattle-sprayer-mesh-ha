@@ -12,7 +12,7 @@
     "custom_components.sinewerx_mesh"
   ],
   "requirements": [],
-  "version": "2.0.1",
+  "version": "2.1.0",
   "zeroconf": [
     "_swx-gw._tcp.local."
   ]
